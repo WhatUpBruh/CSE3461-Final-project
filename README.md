@@ -22,3 +22,13 @@ python3 server.py
 To run multiple clients, just open as many terminals you want and run this script:
 ```bash
 python3 client.py
+
+
+--- 
+
+## Setting up over the air transmission: 
+
+setting up over the air transmission is simple, as all we have to do is to change the host to yoru current host. 
+To find that, run you command prompt and type in ipconfig and find your ip address. Then replace the HOST variable
+with that address. 
+
