@@ -1,35 +1,66 @@
-import sys
-import os
-import random
-import string
-from socket import *
 
-if (len(sys.argv) < 2):
-  print("Usage: python3 " + sys.argv[0] + " relay_port")
-  sys.exit(1)
-assert(len(sys.argv) == 2)
-relay_port=int(sys.argv[1])
+import socket
+import threading
 
-#Q8 TODO: Create a TCP socket for the server  [preferably with name <receiver_socket> to be complaint with the rest of the code]
-receiver_socket = socket(AF_INET, SOCK_STREAM)
+HOST = '127.0.0.1'
+PORT = 3000
 
-#Q9 TODO: Connect this socket to the relay at relay_port
-receiver_socket.connect(("127.0.0.1", relay_port))
+serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+serverSocket.bind((HOST, PORT))
+serverSocket.listen()
 
-# Receive any data relayed from the relay (i.e., any data sent by the sender to the relay)
-data = receiver_socket.recv(200)
+clients = []  # track connected sockets
+addresses = {}  # map socket → address string
 
-# Print debugging information
-print("Data received: ", data.decode())
+def broadcast(message, sender_socket=None):
+    # send message to all clients except the sender
+    for client in clients:
+        if client != sender_socket:
+            try:
+                client.send(message)
+            except:
+                client.close()
+                if client in clients:
+                    clients.remove(client)
 
-#Q10 Convert received number to binary; feel free to use inbuilt function
-send_data = bin(int(data.decode()))[2:]
+def handle_client(client_socket):
+    addr = addresses[client_socket]
+    # listen for messages from client
+    try:
+        while True:
+            message = client_socket.recv(1024)
+            if not message:
+                break
+            broadcast(message, client_socket)
+    except:
+        pass
+    finally:
+        # client disconnected
+        clients.remove(client_socket)
+        client_socket.close()
+        leave_msg = f"[{addr}] has left".encode()
+        broadcast(leave_msg)
 
-# Send computed answer back to relay
-receiver_socket.send(send_data.encode())
+print(f"Server listening on {HOST}:{PORT}...")
 
-# Print debugging information
-print("Data sent back: ", send_data)
+try:
+    while True:
+        # Accept new connections and send a broadcase message to all clients
+        client_socket, addr = serverSocket.accept()
+        addr_str = f"{addr[0]}:{addr[1]}"
+        print(f"New connection from {addr_str}")
+        clients.append(client_socket)
+        addresses[client_socket] = addr_str
 
-# Close any open sockets
-receiver_socket.close()
+        # announce join to all the clients in the chat
+        join_msg = f"[{addr_str}] has joined.".encode()
+        broadcast(join_msg, sender_socket=None)
+
+        # Threading is used to handle multiple clients simultaneously
+        thread = threading.Thread(target=handle_client, args=(client_socket,))
+        thread.start()
+except KeyboardInterrupt:
+    print("\nServer shutting down...")
+    for client in clients:
+        client.close()
+    serverSocket.close()

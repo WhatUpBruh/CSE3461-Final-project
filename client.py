@@ -1,38 +1,44 @@
-import sys
-import os
-import random
-import string
-from socket import *
+import socket
+import threading
 
-if (len(sys.argv) < 3):
-  print("Usage: python3 " + sys.argv[0] + " relay_port integer_to_send")
-  sys.exit(1)
-assert(len(sys.argv) == 3)
-relay_port=int(sys.argv[1])
+HOST = '127.0.0.1'
+PORT = 3000
 
-# Read integer
-data=sys.argv[2]
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client_socket.connect((HOST, PORT))
 
-# Create a socket for the sender
-sender_socket=socket(AF_INET, SOCK_STREAM)
+# Function to receive messages from the server
+def receive_messages():
+    while True:
+        # Handle incoming messages from server
+        try:
+            message = client_socket.recv(1024).decode()
+            if not message:
+                break
+            print(f"\nReceived: {message}")
+            print("You: ", end='', flush=True)
+        except:
+            print("Connection closed.")
+            break
 
-#Q6 TODO: Connect client to the relay at the relay_port; fill the values of <c> and <d>
-sender_socket.connect(("127.0.0.1", relay_port))
+# Function to send messages to the server
+def send_messages():
+    while True:
+        message = input("You: ")
+        # Exit on 'quit' or 'exit'
+        if message.lower() in ("quit", "exit"):
+            client_socket.close()
+            print("You left the chat.")
+            break
+        client_socket.send(message.encode())
 
-# Wait until the server has also connected to the relay
-input("Press enter to start transmissions")
+# Start threads to receive messages
+threading.Thread(target=receive_messages, daemon=True).start()
 
-# Send this to the relay server for it to relay to the receiver
-sender_socket.send(data.encode())
+# Background thread to send messages
+try:
+    send_messages()
+except KeyboardInterrupt:
+    client_socket.close()
+    print("\nClient closed.")
 
-# print debugging information
-print("Data sent: " + data)
-
-#Q7 TODO: Receive computed answer from relay
-newData = sender_socket.recv(200)
-
-# Print received answer
-print("Data received: ", newData.decode())
-
-# Close any open sockets
-sender_socket.close()
